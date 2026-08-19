@@ -78,40 +78,68 @@ async function collectCopilot(token: string): Promise<Snapshot> {
 
 async function collectGrok(token: string): Promise<Snapshot> {
   const now = Date.now();
-  const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
-  const keyInfo = await fetchJson("https://api.x.ai/v1/api-key", { headers });
-  if (expired(keyInfo.status)) {
-    return {
-      provider: "grok-build",
-      source: "worker",
-      timestamp: now,
-      windows: {},
-      status: "auth_expired",
-      error: "xAI rejected token",
-    };
+  const headers = { Authorization: `Bearer ${token}`, Accept: "application/json", "User-Agent": "ai-quota-monitor" };
+
+  if (typeof token === "string" && token.startsWith("xai-")) {
+    const keyInfo = await fetchJson("https://api.x.ai/v1/api-key", { headers });
+    if (expired(keyInfo.status)) {
+      return { provider: "grok-build", source: "worker", timestamp: now, windows: {}, status: "auth_expired", error: "xAI API key rejected" };
+    }
+    const info = (keyInfo.json ?? {}) as { remaining_amount_usd?: number; limit_amount_usd?: number; name?: string };
+    if (typeof info.remaining_amount_usd === "number" && typeof info.limit_amount_usd === "number" && info.limit_amount_usd > 0) {
+      const usedPercent = Math.max(0, Math.min(100, ((info.limit_amount_usd - info.remaining_amount_usd) / info.limit_amount_usd) * 100));
+      return {
+        provider: "grok-build",
+        source: "worker",
+        timestamp: now,
+        plan: info.name || "xAI API key",
+        windows: { monthly: { usedPercent, remainingPercent: remainingPercent(usedPercent) } },
+        credits: { used: info.limit_amount_usd - info.remaining_amount_usd, total: info.limit_amount_usd },
+        status: "ok",
+      };
+    }
   }
-  const info = (keyInfo.json ?? {}) as { remaining_amount_usd?: number; limit_amount_usd?: number; name?: string };
-  if (typeof info.remaining_amount_usd === "number" && typeof info.limit_amount_usd === "number" && info.limit_amount_usd > 0) {
-    const usedPercent = Math.max(0, Math.min(100, ((info.limit_amount_usd - info.remaining_amount_usd) / info.limit_amount_usd) * 100));
-    return {
-      provider: "grok-build",
-      source: "worker",
-      timestamp: now,
-      plan: info.name || "xAI",
-      windows: { monthly: { usedPercent, remainingPercent: remainingPercent(usedPercent) } },
-      credits: { used: info.limit_amount_usd - info.remaining_amount_usd, total: info.limit_amount_usd },
-      status: "ok",
-    };
+
+  const models = await fetchJson("https://api.x.ai/v1/models", { headers });
+  if (expired(models.status)) {
+    return { provider: "grok-build", source: "worker", timestamp: now, windows: {}, status: "auth_expired", error: "xAI OAuth token rejected by /v1/models" };
   }
+  if (!models.ok) {
+    return { provider: "grok-build", source: "worker", timestamp: now, windows: {}, status: "error", error: `models ${models.status}` };
+  }
+
+  let plan = "xAI OAuth";
+  const teams = await fetchJson("https://management-api.x.ai/auth/teams", { headers });
+  if (teams.ok && teams.json && typeof teams.json === "object") {
+    const first = (teams.json as { teams?: Array<{ name?: string; tier?: number; tierId?: number; blockedReasons?: unknown[] }> }).teams?.[0];
+    if (first?.name) plan = first.name;
+    if (typeof first?.tier === "number") plan += ` · tier ${first.tier}`;
+  }
+
+  let exp: number | undefined;
+  try {
+    const payload = token.split(".")[1];
+    if (payload) {
+      const pad = payload.length % 4 === 0 ? "" : "=".repeat(4 - (payload.length % 4));
+      const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/") + pad)) as { exp?: number; tier?: string };
+      if (typeof json.exp === "number") exp = json.exp * 1000;
+    }
+  } catch {
+    /* ignore jwt parse */
+  }
+
   return {
     provider: "grok-build",
     source: "worker",
     timestamp: now,
+    plan,
     windows: {},
-    status: keyInfo.ok ? "partial" : "error",
-    error: "token saved but no spend cap on api-key payload",
+    status: "partial",
+    error: "OAuth 订阅有效（/v1/models 200），但 SuperGrok / Grok Build 的 5h·7d 余量没有稳定公开 API。",
+    raw: exp ? { tokenExpiresAt: exp } : undefined,
   };
 }
+
 
 async function collectClaude(key: string): Promise<Snapshot> {
   const now = Date.now();

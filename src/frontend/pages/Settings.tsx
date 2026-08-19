@@ -2,7 +2,8 @@ import { Button } from "@base-ui/react/button";
 import { useEffect, useState } from "react";
 import type { AccountPublic } from "../../shared/accounts";
 import type { AppConfig, Provider, WebhookKind } from "../../shared/types";
-import { api } from "../lib/api";
+import { api, getToken } from "../lib/api";
+import { wrapAqm1 } from "../lib/wrap";
 
 const PROVIDERS: Provider[] = ["copilot", "grok-build", "claude", "codex"];
 const KINDS: WebhookKind[] = ["generic", "discord", "ntfy", "telegram"];
@@ -75,9 +76,10 @@ export function Settings() {
     setBusy(true);
     setMessage("");
     try {
+      const wrapped = await wrapAqm1(getToken(), { token, kind: "pat" });
       const next = await api<{ accounts: AccountPublic[]; githubOauthReady: boolean }>("/v1/accounts", {
         method: "PUT",
-        body: JSON.stringify({ provider, token, kind: "pat" }),
+        body: JSON.stringify({ provider, wrapped }),
       });
       setAccounts(next.accounts);
       setDrafts((cur) => ({ ...cur, [provider]: "" }));

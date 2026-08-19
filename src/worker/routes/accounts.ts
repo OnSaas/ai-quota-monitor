@@ -1,6 +1,7 @@
 import type { Provider } from "../../shared/types";
 import type { AppEnv } from "../auth";
 import { deleteAccount, getGithubApp, listAccounts, putAccount } from "../accounts";
+import { unwrapAqm1, wrapSecret } from "../crypto";
 
 const PROVIDERS: Provider[] = ["copilot", "grok-build", "claude", "codex"];
 
@@ -17,16 +18,34 @@ export async function handleAccountsGet(env: AppEnv): Promise<Response> {
 }
 
 export async function handleAccountsPut(request: Request, env: AppEnv): Promise<Response> {
-  const body = (await request.json()) as { provider?: unknown; token?: unknown; kind?: unknown; label?: unknown };
-  if (!isProvider(body.provider) || typeof body.token !== "string" || !body.token.trim()) {
-    return Response.json({ error: "provider and token required" }, { status: 400 });
+  const body = (await request.json()) as { provider?: unknown; wrapped?: unknown; token?: unknown };
+  if (!isProvider(body.provider)) {
+    return Response.json({ error: "provider required" }, { status: 400 });
   }
+  if (typeof body.token === "string") {
+    return Response.json({ error: "plaintext token rejected; send wrapped AQMv1 payload" }, { status: 400 });
+  }
+  if (typeof body.wrapped !== "string" || !body.wrapped.startsWith("AQMv1.")) {
+    return Response.json({ error: "wrapped AQMv1 payload required" }, { status: 400 });
+  }
+
+  let inner: { token?: string; kind?: string; label?: string; refreshToken?: string };
+  try {
+    inner = await unwrapAqm1(wrapSecret(env), body.wrapped);
+  } catch {
+    return Response.json({ error: "cannot unwrap credential" }, { status: 400 });
+  }
+  if (!inner.token?.trim()) {
+    return Response.json({ error: "wrapped payload missing token" }, { status: 400 });
+  }
+
   const now = Date.now();
   await putAccount(env, {
     provider: body.provider,
-    kind: body.kind === "oauth" ? "oauth" : "pat",
-    accessToken: body.token.trim(),
-    label: typeof body.label === "string" ? body.label : undefined,
+    kind: inner.kind === "oauth" ? "oauth" : "pat",
+    accessToken: inner.token.trim(),
+    refreshToken: inner.refreshToken,
+    label: inner.label,
     createdAt: now,
     updatedAt: now,
   });
