@@ -1,5 +1,7 @@
 import { Progress } from "@base-ui/react/progress";
+import { useState } from "react";
 import type { Provider, Snapshot, SummaryResponse, UsageWindow, WindowKey } from "../../shared/types";
+import { api } from "../lib/api";
 
 const LABELS: Record<Provider, string> = {
   claude: "Claude",
@@ -92,7 +94,7 @@ function Card({ provider, summary }: { provider: Provider; summary: SummaryRespo
         </p>
       ) : null}
       {snapshot?.error ? <p className="mt-3 text-sm text-warn">{snapshot.error}</p> : null}
-      {!snapshot ? <p className="mt-4 text-sm text-muted">还没有推送数据。配置 Actions Secret 后等待下一次同步。</p> : null}
+      {!snapshot ? <p className="mt-4 text-sm text-muted">还没有数据。到 Settings 连接账号后点「立即同步」。</p> : null}
       <p className="mt-4 text-xs text-muted">
         最后更新 {formatAgo(snapshot?.timestamp)} · 来源 {snapshot?.source ?? "—"}
       </p>
@@ -109,17 +111,40 @@ export function Dashboard({
   onRefresh: () => void;
   busy: boolean;
 }) {
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+
+  async function syncNow() {
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const result = await api<{ count: number }>("/v1/collect", { method: "POST" });
+      setSyncMsg(`已同步 ${result.count} 个账号`);
+      onRefresh();
+    } catch (error) {
+      setSyncMsg(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">额度总览</h1>
-          <p className="text-sm text-muted">数据来源：GitHub Actions。刷新只读 Worker，不会触发采集。</p>
+          <p className="text-sm text-muted">刷新只读 KV。立即同步会用 KV 里的账号凭证去拉用量。</p>
         </div>
-        <button type="button" className="aqm-btn aqm-btn-ghost" onClick={onRefresh} disabled={busy}>
-          {busy ? "刷新中…" : "刷新"}
-        </button>
+        <div className="flex gap-2">
+          <button type="button" className="aqm-btn aqm-btn-primary" onClick={() => void syncNow()} disabled={busy || syncing}>
+            {syncing ? "同步中…" : "立即同步"}
+          </button>
+          <button type="button" className="aqm-btn aqm-btn-ghost" onClick={onRefresh} disabled={busy}>
+            {busy ? "刷新中…" : "刷新"}
+          </button>
+        </div>
       </div>
+      {syncMsg ? <p className="mt-3 text-sm text-muted">{syncMsg}</p> : null}
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {(["copilot", "grok-build", "claude", "codex"] as Provider[]).map((provider) => (
           <Card key={provider} provider={provider} summary={summary} />

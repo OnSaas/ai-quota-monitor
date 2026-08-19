@@ -1,6 +1,8 @@
 export type AppEnv = Env & {
   PUSH_TOKEN?: string;
   ADMIN_TOKEN?: string;
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
 };
 
 function bytesEqual(left: ArrayBuffer, right: ArrayBuffer): boolean {

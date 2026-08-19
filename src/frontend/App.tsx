@@ -37,6 +37,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("connected") || params.get("oauth")) setPage("settings");
     if (!getToken()) {
       setReady(true);
       setAuthed(false);

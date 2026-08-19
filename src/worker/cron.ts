@@ -1,6 +1,7 @@
 import { PROVIDERS, type Provider, type Snapshot } from "../shared/types";
 import type { AppEnv } from "./auth";
-import { getConfig, getLastNotify, getLastPush, getSnapshot, putLastNotify } from "./kv";
+import { collectFromKv } from "./collect";
+import { getConfig, getLastNotify, getLastPush, getSnapshot, putLastNotify, putSnapshot, touchLastPush } from "./kv";
 import { sendWebhook, staleMessage, thresholdMessage } from "./notify";
 
 function lowestRemaining(snapshot: Snapshot): number | null {
@@ -17,6 +18,12 @@ function cooledDown(last: number | null, cooldownMinutes: number, now: number): 
 }
 
 export async function runCron(env: AppEnv): Promise<void> {
+  const collected = await collectFromKv(env);
+  for (const snapshot of collected) {
+    await putSnapshot(env, snapshot);
+    if (snapshot.status !== "error") await touchLastPush(env, snapshot.provider, snapshot.timestamp);
+  }
+
   const config = await getConfig(env);
   const lastPush = await getLastPush(env);
   const now = Date.now();

@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { api, setToken } from "../lib/api";
 
 export function Login({ onAuthed }: { onAuthed: () => void }) {
-  const [token, setLocal] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -11,12 +11,12 @@ export function Login({ onAuthed }: { onAuthed: () => void }) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setToken(token.trim());
+    setToken(password.trim());
     try {
       await api("/v1/summary");
       onAuthed();
     } catch {
-      setError("Token 无效");
+      setError("密码不对");
     } finally {
       setBusy(false);
     }
@@ -30,17 +30,17 @@ export function Login({ onAuthed }: { onAuthed: () => void }) {
       >
         <p className="text-xs uppercase tracking-[0.2em] text-muted">AQM</p>
         <h1 className="mt-2 text-2xl font-semibold">AI Quota Monitor</h1>
-        <p className="mt-2 text-sm text-muted">输入 ADMIN_TOKEN 查看 Dashboard。凭证只存在本机 localStorage。</p>
-        <label className="mt-5 block text-sm text-muted" htmlFor="token">
-          Admin token
+        <p className="mt-2 text-sm text-muted">输入管理员密码。密码由 Worker 机密变量 ADMIN_TOKEN 控制。</p>
+        <label className="mt-5 block text-sm text-muted" htmlFor="password">
+          管理员密码
         </label>
         <input
-          id="token"
+          id="password"
           className="aqm-input mt-1"
           type="password"
           autoComplete="current-password"
-          value={token}
-          onChange={(e) => setLocal(e.target.value)}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
         {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
         <Button type="submit" disabled={busy} className="aqm-btn aqm-btn-primary mt-5 w-full">

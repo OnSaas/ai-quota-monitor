@@ -1,8 +1,16 @@
 import type { AppEnv } from "./auth";
 import { requireToken } from "./auth";
 import { runCron } from "./cron";
+import { handleAccountsDelete, handleAccountsGet, handleAccountsPut } from "./routes/accounts";
+import { handleCollect } from "./routes/collect";
 import { handleConfigGet, handleConfigPut } from "./routes/config";
 import { handleNotifyTest } from "./routes/notify-test";
+import {
+  handleGithubCallback,
+  handleGithubManifestStart,
+  handleGithubSetup,
+  handleGithubStart,
+} from "./routes/oauth";
 import { handlePush } from "./routes/push";
 import { handleSummary } from "./routes/summary";
 
@@ -13,6 +21,13 @@ function jsonError(message: string, status: number): Response {
 async function handleApi(request: Request, env: AppEnv): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
+
+  if (path === "/v1/oauth/github/setup" && request.method === "GET") {
+    return handleGithubSetup(request, env);
+  }
+  if (path === "/v1/oauth/github/callback" && request.method === "GET") {
+    return handleGithubCallback(request, env);
+  }
 
   if (path === "/v1/push" && request.method === "POST") {
     const denied = await requireToken(request, env.PUSH_TOKEN, "PUSH_TOKEN");
@@ -49,6 +64,42 @@ async function handleApi(request: Request, env: AppEnv): Promise<Response> {
     if (denied) return denied;
     await runCron(env);
     return Response.json({ ok: true });
+  }
+
+  if (path === "/v1/collect" && request.method === "POST") {
+    const denied = await requireToken(request, env.ADMIN_TOKEN, "ADMIN_TOKEN");
+    if (denied) return denied;
+    return handleCollect(env);
+  }
+
+  if (path === "/v1/accounts" && request.method === "GET") {
+    const denied = await requireToken(request, env.ADMIN_TOKEN, "ADMIN_TOKEN");
+    if (denied) return denied;
+    return handleAccountsGet(env);
+  }
+
+  if (path === "/v1/accounts" && request.method === "PUT") {
+    const denied = await requireToken(request, env.ADMIN_TOKEN, "ADMIN_TOKEN");
+    if (denied) return denied;
+    return handleAccountsPut(request, env);
+  }
+
+  if (path.startsWith("/v1/accounts/") && request.method === "DELETE") {
+    const denied = await requireToken(request, env.ADMIN_TOKEN, "ADMIN_TOKEN");
+    if (denied) return denied;
+    return handleAccountsDelete(env, path.slice("/v1/accounts/".length));
+  }
+
+  if (path === "/v1/oauth/github/manifest" && request.method === "POST") {
+    const denied = await requireToken(request, env.ADMIN_TOKEN, "ADMIN_TOKEN");
+    if (denied) return denied;
+    return handleGithubManifestStart(request, env);
+  }
+
+  if (path === "/v1/oauth/github/start" && request.method === "POST") {
+    const denied = await requireToken(request, env.ADMIN_TOKEN, "ADMIN_TOKEN");
+    if (denied) return denied;
+    return handleGithubStart(request, env);
   }
 
   if (path.startsWith("/v1/")) {

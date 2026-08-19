@@ -14,7 +14,7 @@ export interface UsageWindow {
 
 export interface Snapshot {
   provider: Provider;
-  source: "actions";
+  source: "actions" | "worker";
   timestamp: number;
   plan?: string;
   windows: Partial<Record<WindowKey, UsageWindow>>;

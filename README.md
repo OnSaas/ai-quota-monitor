@@ -80,7 +80,9 @@ EdgeNux 当前是 Workers Free，账号 Cron 触发器已满（5/5），因此�
 | `/v1/config` | GET / PUT | `ADMIN_TOKEN` |
 | `/v1/notify-test` | POST | `ADMIN_TOKEN` |
 
-Dashboard 登录页输入 `ADMIN_TOKEN`，存在 localStorage。
+Dashboard 登录页输入管理员密码（机密变量 `ADMIN_TOKEN`），存在 localStorage。
+
+Settings 里可 GitHub OAuth 或粘贴 token，凭证 AES-GCM 加密后写入 KV，接口不回传明文。
 
 ## 通知
 
