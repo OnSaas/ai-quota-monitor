@@ -43,14 +43,22 @@ npm run deploy
 
 首次 `wrangler deploy` 会自动创建 KV namespace。
 
+## GitHub Actions 部署
+
+`main` 推送和手动 `workflow_dispatch` 会跑 `.github/workflows/deploy-worker.yml`：先 `typecheck` + `vite build`，再 `wrangler deploy`。PR 只跑检查，不部署。
+
+Worker 的 `PUSH_TOKEN` / `ADMIN_TOKEN` 仍用 `wrangler secret put`（或 Dashboard Secrets），不要写进仓库、不要每次部署覆盖。
+
 ## GitHub Actions Secrets
 
 仓库 Settings → Secrets and variables → Actions：
 
 | Secret | 必须 | 说明 |
 |--------|------|------|
-| `WORKER_PUSH_URL` | 是 | `https://<worker>.<subdomain>.workers.dev/v1/push` |
-| `PUSH_TOKEN` | 是 | 与 Worker `PUSH_TOKEN` 相同 |
+| `CLOUDFLARE_API_TOKEN` | 部署必须 | 权限：Account · Workers Scripts Edit、Workers KV Storage Edit |
+| `CLOUDFLARE_ACCOUNT_ID` | 部署必须 | Cloudflare 账号 ID |
+| `WORKER_PUSH_URL` | 采集必须 | `https://<worker>.<subdomain>.workers.dev/v1/push` |
+| `PUSH_TOKEN` | 采集必须 | 与 Worker `PUSH_TOKEN` 相同 |
 | `COPILOT_TOKEN` | 选 | GitHub PAT |
 | `COPILOT_USERNAME` | 选 | 不填则调 `/user` |
 | `COPILOT_ORG` | 选 | 读 org 账单时填 |
