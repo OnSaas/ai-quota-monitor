@@ -4,6 +4,7 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-08-19",
   "compatibility_flags": ["nodejs_compat"],
+  "account_id": "22788d96116325ff531105e98c23bc95",
   "observability": {
     "enabled": true,
     "logs": { "head_sampling_rate": 1 }
@@ -15,10 +16,8 @@
   },
   "kv_namespaces": [
     {
-      "binding": "KV"
+      "binding": "KV",
+      "id": "566759f25354409e84aa2d5479c35299"
     }
-  ],
-  "triggers": {
-    "crons": ["*/30 * * * *"]
-  }
+  ]
 }

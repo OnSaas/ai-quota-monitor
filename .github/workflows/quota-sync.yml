@@ -31,3 +31,15 @@ jobs:
           ANTHROPIC_ADMIN_KEY: ${{ secrets.ANTHROPIC_ADMIN_KEY }}
           AQM_PUSH_UNSUPPORTED: ${{ secrets.AQM_PUSH_UNSUPPORTED }}
         run: npx tsx scripts/run.ts
+      - name: Run Worker notify check
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          WORKER_BASE_URL: ${{ secrets.WORKER_BASE_URL }}
+        run: |
+          if [ -z "$ADMIN_TOKEN" ] || [ -z "$WORKER_BASE_URL" ]; then
+            echo "ADMIN_TOKEN or WORKER_BASE_URL missing; skip notify check"
+            exit 0
+          fi
+          curl -fsS -X POST "${WORKER_BASE_URL%/}/v1/cron" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H "Content-Type: application/json"

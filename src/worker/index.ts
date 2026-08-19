@@ -44,6 +44,13 @@ async function handleApi(request: Request, env: AppEnv): Promise<Response> {
     return handleNotifyTest(env);
   }
 
+  if (path === "/v1/cron" && request.method === "POST") {
+    const denied = await requireToken(request, env.ADMIN_TOKEN, "ADMIN_TOKEN");
+    if (denied) return denied;
+    await runCron(env);
+    return Response.json({ ok: true });
+  }
+
   if (path.startsWith("/v1/")) {
     return jsonError("not found", 404);
   }
